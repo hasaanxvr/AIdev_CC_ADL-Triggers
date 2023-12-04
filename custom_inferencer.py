@@ -279,9 +279,6 @@ if __name__ == "__main__":
         coordinates = pose_landmarks.flatten().astype(float).tolist()
 
         
-        
-          
-
         input_data = np.array(coordinates).reshape(1, 51)
         output = model(input_data)
         index = tf.argmax(output[0])
@@ -314,7 +311,10 @@ if __name__ == "__main__":
     print(f"Video saved as {output_file}")
     
     try:
-        os.rmdir(temp_dir)
+        import shutil
+        shutil.rmtree(temp_dir)
+
+        #os.rmdir(temp_dir)
         print(f'Temporary directory {temp_dir} deleted.')
     except OSError as e:
         print(f'Error deleting temporary directory: {e}')
