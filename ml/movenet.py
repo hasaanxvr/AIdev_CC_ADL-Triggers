@@ -55,9 +55,12 @@ class Movenet(object):
       model_name += '.tflite'
 
     # Initialize model
+    
     interpreter = Interpreter(model_path=model_name, num_threads=4)
     interpreter.allocate_tensors()
 
+    #interpreter = tf.saved_model.load('D:\MoveNet Classification\saved_model_singlepose')
+    
     self._input_index = interpreter.get_input_details()[0]['index']
     self._output_index = interpreter.get_output_details()[0]['index']
 
@@ -66,7 +69,9 @@ class Movenet(object):
 
     self._interpreter = interpreter
     self._crop_region = None
-
+    
+    
+  
   def init_crop_region(self, image_height: int,
                        image_width: int) -> Dict[(str, float)]:
     """Defines the default crop region.
@@ -304,7 +309,7 @@ class Movenet(object):
     input_image = input_image.astype(dtype=np.uint8)
 
     self._interpreter.set_tensor(self._input_index,
-                                 np.expand_dims(input_image, axis=0))
+                                np.expand_dims(input_image, axis=0))
     self._interpreter.invoke()
 
     keypoints_with_scores = self._interpreter.get_tensor(self._output_index)
