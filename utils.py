@@ -1,34 +1,9 @@
-# Import TF and TF Hub libraries.
 import tensorflow as tf
-import tensorflow_hub as hub
-from tensorflow import keras
-import numpy as np
-
-
-
-import csv
-import cv2
-import itertools
-import numpy as np
-import pandas as pd
-import os
-import sys
-import tempfile
-import tqdm
-
+import utils
 from matplotlib import pyplot as plt
 from matplotlib.collections import LineCollection
-
-import tensorflow as tf
-import tensorflow_hub as hub
 from tensorflow import keras
-
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-
-
-
-
+from data import BodyPart
 
 #@title Functions to visualize the pose estimation results.
 
@@ -65,10 +40,6 @@ def draw_prediction_on_image(
 
   return image_np
 
-
-
-import utils
-from data import BodyPart
 
 
 def get_center_point(landmarks, left_bodypart, right_bodypart):
@@ -157,44 +128,6 @@ def landmarks_to_embedding(landmarks_and_scores):
 
 
 
-
-class_names = ['lie', 'lie_to_sit', 'sit', 'sit_to_stand', 'stand']
-
-inputs = tf.keras.Input(shape=(51))
-embedding = landmarks_to_embedding(inputs)
-
-layer = keras.layers.Dense(128, activation=tf.nn.relu6)(embedding)
-layer = keras.layers.Dropout(0.5)(layer)
-layer = keras.layers.Dense(64, activation=tf.nn.relu6)(layer)
-layer = keras.layers.Dropout(0.5)(layer)
-outputs = keras.layers.Dense(len(class_names), activation="softmax")(layer)
-
-model_cls = keras.Model(inputs, outputs)
-
-#load the weights
-model_cls.load_weights('best_5_classes.hdf5')
-
-
-# Download the model from TF Hub.
-model = tf.saved_model.load('saved_model_singlepose')
-movenet = model.signatures['serving_default']
-
-# Run model inference
-
-#for writing on the image
-text = 'Hello, OpenCV!'
-font = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 1
-font_thickness = 2
-text_color = (0, 0, 255)  # BGR format (green in this case)
-text_position = (50, 50)
-
-
-
-
-
-
-
 def init_crop_region(image_height, image_width):
     """Defines the default crop region.
 
@@ -231,117 +164,14 @@ def init_crop_region(image_height, image_width):
         'height': box_height,
         'width': box_width
     }
-
-
-
-
-from data import person_from_keypoints_with_scores
-
-import imageio
-
-if __name__ == "__main__":
-    
-   
-    
-    #create a temporary directory
-    
-    temp_dir = tempfile.mkdtemp()
-    print(f'Temporary directory: {temp_dir}')
-    
-    output_file = 'sit_stand_sofa.mp4'
-    output_video = imageio.get_writer(output_file, fps=5)
-
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("Error: Could not open video file.")
-        exit()
-
-    i = 0
-    while True:
-        ret, frame = cap.read()
-        
-        frame_path = f'{temp_dir}/frame_{i}.jpg'
-        cv2.imwrite(frame_path, frame)
-        
-        image_path = frame_path
-        image = tf.io.read_file(image_path)
-        image = tf.compat.v1.image.decode_jpeg(image)
-        image = tf.expand_dims(image, axis=0)
-        # Resize and pad the image to keep the aspect ratio and fit the expected size.
-        image_height = 256
-        image_width = 256
-        image = tf.cast(tf.image.resize_with_pad(image, 256, 256), dtype=tf.int32)
-        
-        
-        outputs = movenet(image)
-
-        keypoints = outputs['output_0']
-
-        keypoints_numpy = keypoints.numpy()
-
-        keypoints_with_scores = keypoints_numpy.reshape(17,3)
-        
-        crop_region = init_crop_region(image_height, image_width)
-        
-        print(keypoints_with_scores)
-        for idx in range(len(BodyPart)):
-            keypoints_with_scores[idx, 0] = crop_region[
-          'y_min'] + crop_region['height'] * keypoints_with_scores[idx, 0]
-            keypoints_with_scores[idx, 1] = crop_region[
-          'x_min'] + crop_region['width'] * keypoints_with_scores[idx, 1]
-            
-        
-        
-        #input_data = np.array(keypoints_with_scores).reshape(1, 51)
-        
-        person = person_from_keypoints_with_scores(keypoints_with_scores, image_height, image_width)
-        
-        pose_landmarks = np.array(
-              [[keypoint.coordinate.x, keypoint.coordinate.y, keypoint.score]
-                for keypoint in person.keypoints],
-              dtype=np.float32)
-        
-        coordinates = pose_landmarks.flatten().astype(float).tolist()
-        input_data = np.array(coordinates).reshape(1, 51)
-        
-        output = model_cls(input_data)
-
-        index = tf.argmax(output[0])
-                
-        score = output[0][index]
-                
-        prediction = class_names[index]
-
-        cv2.putText(frame, f'{prediction}, score: {score}', text_position, font, font_scale, text_color, font_thickness)
-
-        cv2.imshow('Video', frame)
-
-        if cv2.waitKey(25) & 0xFF == ord('q'):
-          
-          break
-
-        
-        
-    cap.release()
-   
-    cv2.destroyAllWindows()
-
     
     
-    try:
-        import shutil
-        shutil.rmtree(temp_dir)
+    
 
-            #os.rmdir(temp_dir)
-        print(f'Temporary directory {temp_dir} deleted.')
-    except OSError as e:
-            print(f'Error deleting temporary directory: {e}')
+def load_class_names():
+  file_path = 'class_names.txt'
 
+  with open(file_path, 'r') as file:
+      class_names = [class_name.strip() for class_name in file.readlines()]
 
-
-
-
-
-
-
-
+  return class_names

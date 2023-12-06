@@ -1,0 +1,5 @@
+lie
+lie to sit trigger
+sit 
+sit to stand trigger
+stand
