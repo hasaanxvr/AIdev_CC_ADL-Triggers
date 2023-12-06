@@ -50,6 +50,9 @@ outputs = keras.layers.Dense(len(class_names), activation="softmax")(layer)
 
 model_cls = keras.Model(inputs, outputs)
 
+print('Loading the pose classifier model...')
+#model_cls = load_model('pose_classifier.h5')
+
 print('Loading the model weights')
 model_cls.load_weights('pose_cls_model_weights.hdf5')
 
