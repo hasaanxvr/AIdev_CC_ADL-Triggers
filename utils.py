@@ -175,3 +175,98 @@ def load_class_names():
       class_names = [class_name.strip() for class_name in file.readlines()]
 
   return class_names
+
+
+import numpy as np
+from typing import List, Tuple
+from data import Person
+import cv2
+
+def visualize(
+    image: np.ndarray,
+    list_persons: List[Person],
+    keypoint_color: Tuple[int, ...] = None,
+    keypoint_threshold: float = 0.05,
+    instance_threshold: float = 0.1,
+) -> np.ndarray:
+  """Draws landmarks and edges on the input image and return it.
+
+  Args:
+    image: The input RGB image.
+    list_persons: The list of all "Person" entities to be visualize.
+    keypoint_color: the colors in which the landmarks should be plotted.
+    keypoint_threshold: minimum confidence score for a keypoint to be drawn.
+    instance_threshold: minimum confidence score for a person to be drawn.
+
+  Returns:
+    Image with keypoints and edges.
+  """
+  for person in list_persons:
+    if person.score < instance_threshold:
+      continue
+
+    keypoints = person.keypoints
+    bounding_box = person.bounding_box
+
+    # Assign a color to visualize keypoints.
+    if keypoint_color is None:
+      if person.id is None:
+        # If there's no person id, which means no tracker is enabled, use
+        # a default color.
+        person_color = (0, 255, 0)
+      else:
+        # If there's a person id, use different color for each person.
+        person_color = COLOR_LIST[person.id % len(COLOR_LIST)]
+    else:
+      person_color = keypoint_color
+
+    # Draw all the landmarks
+    for i in range(len(keypoints)):
+      if keypoints[i].score >= keypoint_threshold:
+        cv2.circle(image, keypoints[i].coordinate, 2, person_color, 4)
+
+    # Draw all the edges
+    for edge_pair, edge_color in KEYPOINT_EDGE_INDS_TO_COLOR.items():
+      if (keypoints[edge_pair[0]].score > keypoint_threshold and
+          keypoints[edge_pair[1]].score > keypoint_threshold):
+        cv2.line(image, keypoints[edge_pair[0]].coordinate,
+                 keypoints[edge_pair[1]].coordinate, edge_color, 2)
+
+    # Draw bounding_box with multipose
+    if bounding_box is not None:
+      start_point = bounding_box.start_point
+      end_point = bounding_box.end_point
+      cv2.rectangle(image, start_point, end_point, person_color, 2)
+      # Draw id text when tracker is enabled for MoveNet MultiPose model.
+      # (id = None when using single pose model or when tracker is None)
+      if person.id:
+        id_text = 'id = ' + str(person.id)
+        cv2.putText(image, id_text, start_point, cv2.FONT_HERSHEY_PLAIN, 1,
+                    (0, 0, 255), 1)
+
+  return image
+
+
+
+
+def core_points_detected(keypoints):
+  
+  LEFT_SHOULDER_SCORE = keypoints[5].score
+  RIGHT_SHOULDER_SCORE = keypoints[6].score
+  
+  LEFT_HIP_SCORE = keypoints[11].score
+  RIGHT_HIP_SCORE = keypoints[12].score
+  
+  LEFT_KNEE_SCORE = keypoints[13].score
+  RIGHT_KNEE_SCORE = keypoints[14].score
+  
+  
+  if (LEFT_SHOULDER_SCORE < 0.1 or
+    RIGHT_SHOULDER_SCORE < 0.1 or
+    LEFT_HIP_SCORE < 0.1 or
+    RIGHT_HIP_SCORE < 0.1 or
+    LEFT_KNEE_SCORE < 0.1 or
+    RIGHT_KNEE_SCORE < 0.1):
+      return False
+    
+  return True

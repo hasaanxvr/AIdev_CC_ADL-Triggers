@@ -1,5 +1,7 @@
+left sleeping pose
 lie
 lie to sit trigger
+right sleeping pose
 sit 
 sit to stand trigger
 stand

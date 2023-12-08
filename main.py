@@ -28,6 +28,7 @@ from data import BodyPart
 from utils import landmarks_to_embedding
 from utils import init_crop_region
 from utils import load_class_names
+from utils import core_points_detected
 from keras.models import load_model
 
 from data import person_from_keypoints_with_scores
@@ -54,7 +55,7 @@ print('Loading the pose classifier model...')
 #model_cls = load_model('pose_classifier.h5')
 
 print('Loading the model weights')
-model_cls.load_weights('pose_cls_model_weights.hdf5')
+model_cls.load_weights('weights.best.hdf5')
 
 
 
@@ -71,6 +72,11 @@ text_color = (0, 0, 255)  # BGR format (green in this case)
 text_position = (50, 50)
 
 
+
+
+
+
+from utils import visualize
 
 if __name__ == "__main__":
     
@@ -124,20 +130,37 @@ if __name__ == "__main__":
         
         person = person_from_keypoints_with_scores(keypoints_with_scores, image_height, image_width)
         
-        pose_landmarks = np.array(
-              [[keypoint.coordinate.x, keypoint.coordinate.y, keypoint.score]
-                for keypoint in person.keypoints],
-              dtype=np.float32)
         
-        coordinates = pose_landmarks.flatten().astype(float).tolist()
-        input_data = np.array(coordinates).reshape(1, 51)
         
-        output = model_cls(input_data)
-        index = tf.argmax(output[0])
-        score = output[0][index]
-        prediction = class_names[index]
+        if core_points_detected(person.keypoints):
+          pose_landmarks = np.array(
+                [[keypoint.coordinate.x, keypoint.coordinate.y, keypoint.score]
+                  for keypoint in person.keypoints],
+                dtype=np.float32)
+          
+          coordinates = pose_landmarks.flatten().astype(float).tolist()
+          
+          
+          detected_points = 0
+          for i in range(0,51,3):
+            #x = int(coordinates[i])  # Convert to integer
+            #y = int(coordinates[i+1])
+            #cv2.circle(frame, (x,y), 5, (0, 0, 255), -1)  # Draw a red filled circle
+            
+            score = coordinates[i+2]
+            if score > 0.1:
+              detected_points +=1
+              
+          print(detected_points)
 
-        cv2.putText(frame, f'{prediction}, score: {score}', text_position, font, font_scale, text_color, font_thickness)
+          input_data = np.array(coordinates).reshape(1, 51)
+          
+          output = model_cls(input_data)
+          index = tf.argmax(output[0])
+          score = output[0][index]
+          prediction = class_names[index]
+
+          cv2.putText(frame, f'{prediction}, score: {score}', text_position, font, font_scale, text_color, font_thickness)
 
         cv2.imshow('Video', frame)
 
