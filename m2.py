@@ -101,7 +101,7 @@ if __name__ == "__main__":
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     # Specify the output video file path and codec
-    output_video_path = 'near_7_classes.mp4'
+    output_video_path = 'diagonal_turns.mp4'
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     
     out = cv2.VideoWriter(output_video_path, fourcc, 10 , (width, height))
