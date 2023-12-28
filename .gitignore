@@ -1,3 +1,4 @@
 *.mp4
 D:\MoveNet Classification\MoveNet-Tensorflow\__pycache__
 /videos
+/__pycache__

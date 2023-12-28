@@ -4,6 +4,8 @@ from matplotlib import pyplot as plt
 from matplotlib.collections import LineCollection
 from tensorflow import keras
 from data import BodyPart
+from typing import Dict
+
 
 #@title Functions to visualize the pose estimation results.
 
@@ -107,7 +109,7 @@ def normalize_pose_landmarks(landmarks):
   # Scale the landmarks to a constant pose size
   pose_size = get_pose_size(landmarks)
   landmarks /= pose_size
-
+ 
   return landmarks
 
 
@@ -119,53 +121,12 @@ def landmarks_to_embedding(landmarks_and_scores):
   # Normalize landmarks 2D
   landmarks = normalize_pose_landmarks(reshaped_inputs[:, :, :2])
 
+  print(landmarks)
   # Flatten the normalized landmark coordinates into a vector
   embedding = keras.layers.Flatten()(landmarks)
 
   return embedding
 
-
-
-
-
-def init_crop_region(image_height, image_width):
-    """Defines the default crop region.
-
-    The function provides the initial crop region (pads the full image from
-    both sides to make it a square image) when the algorithm cannot reliably
-    determine the crop region from the previous frame.
-
-    Args:
-      image_height (int): The input image width
-      image_width (int): The input image height
-
-    Returns:
-      crop_region (dict): The default crop region.
-    """
-    if image_width > image_height:
-      x_min = 0.0
-      box_width = 1.0
-      # Pad the vertical dimension to become a square image.
-      y_min = (image_height / 2 - image_width / 2) / image_height
-      box_height = image_width / image_height
-    else:
-      y_min = 0.0
-      box_height = 1.0
-      # Pad the horizontal dimension to become a square image.
-      x_min = (image_width / 2 - image_height / 2) / image_width
-      box_width = image_height / image_width
-      
-
-    return {
-        'y_min': y_min,
-        'x_min': x_min,
-        'y_max': y_min + box_height,
-        'x_max': x_min + box_width,
-        'height': box_height,
-        'width': box_width
-    }
-    
-    
     
 
 def load_class_names():
@@ -177,80 +138,9 @@ def load_class_names():
   return class_names
 
 
-import numpy as np
-from typing import List, Tuple
-from data import Person
-import cv2
-
-def visualize(
-    image: np.ndarray,
-    list_persons: List[Person],
-    keypoint_color: Tuple[int, ...] = None,
-    keypoint_threshold: float = 0.05,
-    instance_threshold: float = 0.1,
-) -> np.ndarray:
-  """Draws landmarks and edges on the input image and return it.
-
-  Args:
-    image: The input RGB image.
-    list_persons: The list of all "Person" entities to be visualize.
-    keypoint_color: the colors in which the landmarks should be plotted.
-    keypoint_threshold: minimum confidence score for a keypoint to be drawn.
-    instance_threshold: minimum confidence score for a person to be drawn.
-
-  Returns:
-    Image with keypoints and edges.
-  """
-  for person in list_persons:
-    if person.score < instance_threshold:
-      continue
-
-    keypoints = person.keypoints
-    bounding_box = person.bounding_box
-
-    # Assign a color to visualize keypoints.
-    if keypoint_color is None:
-      if person.id is None:
-        # If there's no person id, which means no tracker is enabled, use
-        # a default color.
-        person_color = (0, 255, 0)
-      else:
-        # If there's a person id, use different color for each person.
-        person_color = COLOR_LIST[person.id % len(COLOR_LIST)]
-    else:
-      person_color = keypoint_color
-
-    # Draw all the landmarks
-    for i in range(len(keypoints)):
-      if keypoints[i].score >= keypoint_threshold:
-        cv2.circle(image, keypoints[i].coordinate, 2, person_color, 4)
-
-    # Draw all the edges
-    for edge_pair, edge_color in KEYPOINT_EDGE_INDS_TO_COLOR.items():
-      if (keypoints[edge_pair[0]].score > keypoint_threshold and
-          keypoints[edge_pair[1]].score > keypoint_threshold):
-        cv2.line(image, keypoints[edge_pair[0]].coordinate,
-                 keypoints[edge_pair[1]].coordinate, edge_color, 2)
-
-    # Draw bounding_box with multipose
-    if bounding_box is not None:
-      start_point = bounding_box.start_point
-      end_point = bounding_box.end_point
-      cv2.rectangle(image, start_point, end_point, person_color, 2)
-      # Draw id text when tracker is enabled for MoveNet MultiPose model.
-      # (id = None when using single pose model or when tracker is None)
-      if person.id:
-        id_text = 'id = ' + str(person.id)
-        cv2.putText(image, id_text, start_point, cv2.FONT_HERSHEY_PLAIN, 1,
-                    (0, 0, 255), 1)
-
-  return image
-
-
 
 
 def core_points_detected(keypoints):
-  
   LEFT_SHOULDER_SCORE = keypoints[5].score
   RIGHT_SHOULDER_SCORE = keypoints[6].score
   
@@ -270,3 +160,10 @@ def core_points_detected(keypoints):
       return False
     
   return True
+ 
+ 
+ 
+ 
+ 
+ 
+ 

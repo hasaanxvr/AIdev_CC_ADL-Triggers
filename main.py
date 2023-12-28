@@ -3,7 +3,7 @@ import tensorflow as tf
 import tensorflow_hub as hub
 from tensorflow import keras
 import numpy as np
-
+from movenet_utils import Movenet
 
 
 import csv
@@ -15,7 +15,7 @@ import os
 import sys
 import tempfile
 import tqdm
-
+import time
 
 import tensorflow as tf
 import tensorflow_hub as hub
@@ -26,13 +26,20 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 
 from data import BodyPart
 from utils import landmarks_to_embedding
-from utils import init_crop_region
 from utils import load_class_names
 from utils import core_points_detected
 from keras.models import load_model
 
 from data import person_from_keypoints_with_scores
 import imageio
+
+#initilize the movenet model
+movenet = Movenet()
+
+
+def detect(input):
+  movenet.detect(input, True)
+  return movenet.detect(input, False)
 
 
 
@@ -60,9 +67,8 @@ model_cls.load_weights('run_4.hdf5')
 
 
 # Download the model from TF Hub.
-model = tf.saved_model.load('saved_model_singlepose')
-movenet = model.signatures['serving_default']
-
+#model = tf.saved_model.load('saved_model_singlepose')
+#movenet = model.signatures['serving_default']
 
 #for writing on the image
 font = cv2.FONT_HERSHEY_SIMPLEX
@@ -77,19 +83,54 @@ text_position = (50, 50)
 
 
 
-from utils import visualize
+
+
+
+
+
+def add_state(current_state, states):
+  if current_state == -1:
+    return states  
+  
+  if len(states) > 0:
+    previous_state = states[len(states) - 1]
+    
+    if previous_state != current_state:
+      states.append(current_state)
+    
+    return states
+  
+  states.append(current_state)
+  return states
+
+
+
+def create_transition_embedding(states):
+  embedding = ''
+  for state in states:
+    
+    embedding += str(state)
+
+  return embedding
+
+
+
+
+
+states = []
+
+from transitions import transition_valid
 
 if __name__ == "__main__":
     
-   
+    
+    
     
     #create a temporary directory
     
     temp_dir = tempfile.mkdtemp()
     print(f'Temporary directory: {temp_dir}')
     
-    output_file = 'sit_stand_sofa.mp4'
-    output_video = imageio.get_writer(output_file, fps=1)
 
     cap = cv2.VideoCapture(0)
     
@@ -101,10 +142,10 @@ if __name__ == "__main__":
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     # Specify the output video file path and codec
-    output_video_path = 'near_7_classes.mp4'
+    output_video_path = 'test.mp4'
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     
-    out = cv2.VideoWriter(output_video_path, fourcc, 10 , (width, height))
+    out = cv2.VideoWriter(output_video_path, fourcc, 5 , (width, height))
     
     
     
@@ -114,8 +155,9 @@ if __name__ == "__main__":
 
     i = 0
     while True:
+      
         ret, frame = cap.read()
-        
+          
         frame_path = f'{temp_dir}/frame_{i}.jpg'
         cv2.imwrite(frame_path, frame)
         
@@ -126,31 +168,13 @@ if __name__ == "__main__":
         # Resize and pad the image to keep the aspect ratio and fit the expected size.
         image_height = 256
         image_width = 256
-        image = tf.cast(tf.image.resize_with_pad(image, 256, 256), dtype=tf.int32)
         
+        #perform the detection
         
-        outputs = movenet(image)
-        keypoints = outputs['output_0']
-
-        keypoints_numpy = keypoints.numpy()
-        keypoints_with_scores = keypoints_numpy.reshape(17,3)
-        crop_region = init_crop_region(image_height, image_width)
-        
-        for idx in range(len(BodyPart)):
-            keypoints_with_scores[idx, 0] = crop_region[
-          'y_min'] + crop_region['height'] * keypoints_with_scores[idx, 0]
-            keypoints_with_scores[idx, 1] = crop_region[
-          'x_min'] + crop_region['width'] * keypoints_with_scores[idx, 1]
-            
-        
-        
-        #input_data = np.array(keypoints_with_scores).reshape(1, 51)
-        
-        person = person_from_keypoints_with_scores(keypoints_with_scores, image_height, image_width)
-        
-        
+        person = detect(image)        
         
         if core_points_detected(person.keypoints):
+          
           pose_landmarks = np.array(
                 [[keypoint.coordinate.x, keypoint.coordinate.y, keypoint.score]
                   for keypoint in person.keypoints],
@@ -178,8 +202,23 @@ if __name__ == "__main__":
           index = tf.argmax(output[0])
           score = output[0][index]
           prediction = class_names[index]
+          
+          #transition_logic
+          states = add_state(int(index), states)
+          if len(states) == 3:
+            embedding = create_transition_embedding(states)
+            transition = transition_valid(embedding)
+            print(transition)
+          
+            states = []
+          
+          
+          index = -1
+        
 
           cv2.putText(frame, f'{prediction}, score: {score}', text_position, font, font_scale, text_color, font_thickness)
+          cv2.putText(frame, f'{states}', (400,400), font, font_scale, text_color, font_thickness)
+          
 
         cv2.imshow('Video', frame)
         out.write(frame)
