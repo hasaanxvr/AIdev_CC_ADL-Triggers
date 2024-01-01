@@ -38,6 +38,7 @@ movenet = Movenet()
 
 
 def detect(input):
+  input = input.numpy()
   movenet.detect(input, True)
   return movenet.detect(input, False)
 
@@ -117,7 +118,9 @@ def create_transition_embedding(states):
 
 
 
-states = []
+previous_state = -1
+current_state = -1
+
 
 from transitions import transition_valid
 
@@ -132,7 +135,7 @@ if __name__ == "__main__":
     print(f'Temporary directory: {temp_dir}')
     
 
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture('output.mp4')
     
     
     
@@ -163,15 +166,12 @@ if __name__ == "__main__":
         
         image_path = frame_path
         image = tf.io.read_file(image_path)
-        image = tf.compat.v1.image.decode_jpeg(image)
-        image = tf.expand_dims(image, axis=0)
-        # Resize and pad the image to keep the aspect ratio and fit the expected size.
-        image_height = 256
-        image_width = 256
+        image = tf.io.decode_jpeg(image)
+      
         
         #perform the detection
+        person = detect(image)       
         
-        person = detect(image)        
         
         if core_points_detected(person.keypoints):
           
@@ -181,43 +181,28 @@ if __name__ == "__main__":
                 dtype=np.float32)
           
           coordinates = pose_landmarks.flatten().astype(float).tolist()
-          
-          
-          detected_points = 0
-          for i in range(0,51,3):
-            x = int(coordinates[i])  # Convert to integer
-            y = int(coordinates[i+1])
-            cv2.circle(frame, (x,y), 5, (0, 0, 255), -1)  # Draw a red filled circle
-            
-            score = coordinates[i+2]
-            if score > 0.1:
-              detected_points +=1
-              
-          #print(detected_points)
-
+                    
           input_data = np.array(coordinates).reshape(1, 51)
           
           output = model_cls(input_data)
           
           index = tf.argmax(output[0])
+          
+          previous_state = current_state
+          current_state = index
+          
+          if current_state == 5 and previous_state == 4:
+            cv2.putText(frame, f'The patient is trying to stand up!', (100,500), font, font_scale, text_color, font_thickness)
+            
+          if current_state == 2 and previous_state == 1:
+            cv2.putText(frame, f'The patient is trying to sit!', (100,500), font, font_scale, text_color, font_thickness)
+          
+          
           score = output[0][index]
           prediction = class_names[index]
           
-          #transition_logic
-          states = add_state(int(index), states)
-          if len(states) == 3:
-            embedding = create_transition_embedding(states)
-            transition = transition_valid(embedding)
-            print(transition)
-          
-            states = []
-          
-          
-          index = -1
         
-
-          cv2.putText(frame, f'{prediction}, score: {score}', text_position, font, font_scale, text_color, font_thickness)
-          cv2.putText(frame, f'{states}', (400,400), font, font_scale, text_color, font_thickness)
+          #cv2.putText(frame, f'{prediction}', text_position, font, font_scale, text_color, font_thickness)
           
 
         cv2.imshow('Video', frame)

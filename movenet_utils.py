@@ -21,6 +21,8 @@ class Movenet(object):
   def __init__(self):
     model = tf.saved_model.load('saved_model_singlepose')
     self.movenet = model.signatures['serving_default']
+    self._input_height = 256
+    self._input_width = 256
   
   
     
@@ -234,7 +236,8 @@ class Movenet(object):
     padding_left = int(0 - x_min * image.shape[1] if x_min < 0 else 0)
     padding_right = int((x_max - 1) * image.shape[1] if x_max >= 1 else 0)
 
-    # Crop and resize image
+    
+    
     output_image = image[crop_top:crop_bottom, crop_left:crop_right]
     output_image = cv2.copyMakeBorder(output_image, padding_top, padding_bottom,
                                       padding_left, padding_right,
@@ -247,12 +250,19 @@ class Movenet(object):
 
   def detect(self, image, reset_crop_region):
       
-        image_height, image_width = 256, 256
-        image = tf.cast(tf.image.resize_with_pad(image, image_height, image_width), dtype=tf.int32)
+        image_height, image_width = image.shape[0], image.shape[1]
+        
+        
+        #image = tf.cast(tf.image.resize_with_pad(image, image_height, image_width), dtype=tf.int32)
     
         if reset_crop_region:
         # Set crop region for the first frame.
             self._crop_region = self.init_crop_region(image_height, image_width)
+
+
+        image = self._crop_and_resize(image, self._crop_region, (self._input_height, self._input_width))
+        image = tf.expand_dims(image, axis=0)
+        image = tf.cast(image, dtype=tf.int32)
 
         
         outputs = self.movenet(image)
@@ -267,6 +277,7 @@ class Movenet(object):
             keypoints_with_scores[idx, 1] = self._crop_region[
           'x_min'] + self._crop_region['width'] * keypoints_with_scores[idx, 1]
             
+        
         
         self._crop_region = self._determine_crop_region(keypoints_with_scores, image_height, image_width)  
         person = person_from_keypoints_with_scores(keypoints_with_scores, image_height, image_width)
