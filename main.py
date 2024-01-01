@@ -63,7 +63,7 @@ print('Loading the pose classifier model...')
 #model_cls = load_model('pose_classifier.h5')
 
 print('Loading the model weights')
-model_cls.load_weights('run_4.hdf5')
+model_cls.load_weights('pose_classification_weights.hdf5')
 
 
 
