@@ -63,7 +63,7 @@ print('Loading the pose classifier model...')
 #model_cls = load_model('pose_classifier.h5')
 
 print('Loading the model weights')
-model_cls.load_weights('pose_classification_weights.hdf5')
+model_cls.load_weights('best_5_classes.hdf5')
 
 
 
@@ -80,6 +80,20 @@ text_position = (50, 50)
 
 
 
+
+
+def get_points(coordinates):
+    points = []
+    
+    i = 0
+    
+    while i < len(coordinates):
+      point = (coordinates[i], coordinates[i+1])
+      points.append(point)
+      
+      i+=3
+      
+    return points
 
 
 
@@ -121,6 +135,8 @@ def create_transition_embedding(states):
 previous_state = -1
 current_state = -1
 
+transition_state = -1
+
 
 from transitions import transition_valid
 
@@ -135,9 +151,11 @@ if __name__ == "__main__":
     print(f'Temporary directory: {temp_dir}')
     
 
-    cap = cv2.VideoCapture('output.mp4')
-    
-    
+    video_name = 'adlvideo33.mp4'
+
+    cap = cv2.VideoCapture(f'videos/{video_name}')
+    #cap = cv2.VideoCapture()
+
     
     # Get video properties
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -145,11 +163,10 @@ if __name__ == "__main__":
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     # Specify the output video file path and codec
-    output_video_path = 'test.mp4'
+    output_video_path = f'results/{video_name}'
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     
     out = cv2.VideoWriter(output_video_path, fourcc, 5 , (width, height))
-    
     
     
     if not cap.isOpened():
@@ -168,10 +185,10 @@ if __name__ == "__main__":
         image = tf.io.read_file(image_path)
         image = tf.io.decode_jpeg(image)
       
+
         
         #perform the detection
         person = detect(image)       
-        
         
         if core_points_detected(person.keypoints):
           
@@ -181,8 +198,11 @@ if __name__ == "__main__":
                 dtype=np.float32)
           
           coordinates = pose_landmarks.flatten().astype(float).tolist()
-                    
+          
+          
+          
           input_data = np.array(coordinates).reshape(1, 51)
+      
           
           output = model_cls(input_data)
           
@@ -191,18 +211,59 @@ if __name__ == "__main__":
           previous_state = current_state
           current_state = index
           
-          if current_state == 5 and previous_state == 4:
-            cv2.putText(frame, f'The patient is trying to stand up!', (100,500), font, font_scale, text_color, font_thickness)
-            
-          if current_state == 2 and previous_state == 1:
-            cv2.putText(frame, f'The patient is trying to sit!', (100,500), font, font_scale, text_color, font_thickness)
-          
           
           score = output[0][index]
           prediction = class_names[index]
           
+          if index == 1:
+            if output[0][0] > 0.1:
+              prediction = 'lie'
+              current_state = 0
+          
+          """
+          if (current_state == 5 and previous_state == 4) or (current_state == 6 and previous_state == 4):
+            cv2.putText(frame, f'The patient is trying to stand up!', (100,500), font, font_scale, text_color, font_thickness)
+          
+          if current_state == 2 and previous_state == 1:
+            cv2.putText(frame, f'The patient is trying to sit!', (100,500), font, font_scale, text_color, font_thickness)
+          """
+          
+          
+          if (current_state == 3 and previous_state == 2) or (current_state == 4 and previous_state == 2):
+            cv2.putText(frame, f'The patient is trying to stand up!', (100,500), font, font_scale, text_color, font_thickness)
+            transition_state = 1
+            
+          if current_state == 1 and previous_state == 0:
+            cv2.putText(frame, f'The patient is trying to sit!', (100,500), font, font_scale, text_color, font_thickness)
+            
+            
+          if transition_state == 1:
+            if current_state == 2:
+              cv2.putText(frame, f'failed sit to stand transition!', (100,500), font, font_scale, text_color, font_thickness)
+              transition_state = -1
+            if current_state == 4:
+              cv2.putText(frame, f'sit to stand transition complete', (200,500), font, font_scale, (0, 255, 0), font_thickness)
+              transition_state = -1
+            
+          points = get_points(coordinates)
+          
+          #draw landmarks on the image
+          for landmark in points:
+            x, y = landmark
+            cv2.circle(frame, (int(x), int(y)), 5, (0, 255, 0), -1)  # Circle radius: 5, color: (0, 255, 0)
+
+          
+          score = output[0][index]
+          prediction = class_names[index]
+          
+          if index == 1:
+              lie_score = output[0][0]
+              if lie_score > 0.01:
+                prediction = 'lie'
+          
         
-          #cv2.putText(frame, f'{prediction}', text_position, font, font_scale, text_color, font_thickness)
+          cv2.putText(frame, f'{prediction}', text_position, font, font_scale, text_color, font_thickness)
+          cv2.putText(frame, f'{output[0][0]}, {output[0][1]}', (50, 200), font, font_scale, text_color, font_thickness)
           
 
         cv2.imshow('Video', frame)
