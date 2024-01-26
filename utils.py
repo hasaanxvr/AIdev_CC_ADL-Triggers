@@ -47,9 +47,11 @@ def draw_prediction_on_image(
 def get_center_point(landmarks, left_bodypart, right_bodypart):
   """Calculates the center point of the two given landmarks."""
 
+ 
   left = tf.gather(landmarks, left_bodypart.value, axis=1)
   right = tf.gather(landmarks, right_bodypart.value, axis=1)
   center = left * 0.5 + right * 0.5
+  
   return center
 
 
@@ -96,6 +98,9 @@ def normalize_pose_landmarks(landmarks):
   """Normalizes the landmarks translation by moving the pose center to (0,0) and
   scaling it to a constant pose size.
   """
+  
+ 
+ 
   # Move landmarks so that the pose center becomes (0,0)
   pose_center = get_center_point(landmarks, BodyPart.LEFT_HIP, 
                                  BodyPart.RIGHT_HIP)
@@ -116,15 +121,16 @@ def normalize_pose_landmarks(landmarks):
 def landmarks_to_embedding(landmarks_and_scores):
   """Converts the input landmarks into a pose embedding."""
   # Reshape the flat input into a matrix with shape=(17, 3)
+  
   reshaped_inputs = keras.layers.Reshape((17, 3))(landmarks_and_scores)
 
   # Normalize landmarks 2D
   landmarks = normalize_pose_landmarks(reshaped_inputs[:, :, :2])
 
-  print(landmarks)
   # Flatten the normalized landmark coordinates into a vector
   embedding = keras.layers.Flatten()(landmarks)
 
+  
   return embedding
 
     

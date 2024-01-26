@@ -162,6 +162,8 @@ class Movenet(object):
       crop_region (dict): The crop region to run inference on.
     """
     # Convert keypoint index to human-readable names.
+    
+  
     target_keypoints = {}
     for idx in range(len(BodyPart)):
       target_keypoints[BodyPart(idx)] = [

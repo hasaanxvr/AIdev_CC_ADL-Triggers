@@ -5,7 +5,6 @@ from tensorflow import keras
 import numpy as np
 from movenet_utils import Movenet
 
-
 import csv
 import cv2
 import itertools
@@ -21,10 +20,8 @@ import tensorflow as tf
 import tensorflow_hub as hub
 from tensorflow import keras
 
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-
 from data import BodyPart
+
 from utils import landmarks_to_embedding
 from utils import load_class_names
 from utils import core_points_detected
@@ -33,6 +30,8 @@ from keras.models import load_model
 from data import person_from_keypoints_with_scores
 import imageio
 
+from risky_behaviors import *
+
 #initilize the movenet model
 movenet = Movenet()
 
@@ -40,14 +39,12 @@ movenet = Movenet()
 def detect(input):
   input = input.numpy()
   movenet.detect(input, True)
+  
   return movenet.detect(input, False)
 
 
 
 class_names = load_class_names()
-
-
-
 inputs = tf.keras.Input(shape=(51))
 embedding = landmarks_to_embedding(inputs)
 
@@ -97,6 +94,11 @@ def get_points(coordinates):
 
 
 
+def get_coordinates(bodyPart, person):
+    x = person.keypoints[bodyPart].coordinate[0]
+    y = person.keypoints[bodyPart].coordinate[1]
+    
+    return (x,y)
 
 
 
@@ -136,6 +138,7 @@ previous_state = -1
 current_state = -1
 
 transition_state = -1
+transition_tries = 0
 
 
 from transitions import transition_valid
@@ -151,10 +154,10 @@ if __name__ == "__main__":
     print(f'Temporary directory: {temp_dir}')
     
 
-    video_name = 'adlvideo33.mp4'
+    video_name = 'adlvideo11.mp4'
 
     cap = cv2.VideoCapture(f'videos/{video_name}')
-    #cap = cv2.VideoCapture()
+    cap = cv2.VideoCapture(0)
 
     
     # Get video properties
@@ -166,7 +169,7 @@ if __name__ == "__main__":
     output_video_path = f'results/{video_name}'
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     
-    out = cv2.VideoWriter(output_video_path, fourcc, 5 , (width, height))
+    out = cv2.VideoWriter(output_video_path, fourcc, 5, (width, height))
     
     
     if not cap.isOpened():
@@ -188,7 +191,24 @@ if __name__ == "__main__":
 
         
         #perform the detection
-        person = detect(image)       
+        person = detect(image)      
+        
+        
+        right_shoulder = get_coordinates(BodyPart.RIGHT_SHOULDER.value, person)
+        left_shoulder = get_coordinates(BodyPart.LEFT_SHOULDER.value, person)
+        right_knee = get_coordinates(BodyPart.RIGHT_KNEE.value, person)
+        left_knee = get_coordinates(BodyPart.LEFT_KNEE.value, person)
+        right_hip = get_coordinates(BodyPart.RIGHT_HIP.value, person)
+        left_hip = get_coordinates(BodyPart.LEFT_HIP.value, person)
+        
+        #calculate risky sitting
+        th1, th2 = risky_sitting(right_shoulder, left_shoulder, right_knee, left_knee, right_hip, left_hip)
+        
+        
+        #calculate hip flexion angle
+        left_hip_angle = get_hip_flexion_angle(left_shoulder, left_knee, left_hip)
+        right_hip_angle = get_hip_flexion_angle(right_shoulder, right_knee, right_hip)
+        
         
         if core_points_detected(person.keypoints):
           
@@ -199,10 +219,7 @@ if __name__ == "__main__":
           
           coordinates = pose_landmarks.flatten().astype(float).tolist()
           
-          
-          
           input_data = np.array(coordinates).reshape(1, 51)
-      
           
           output = model_cls(input_data)
           
@@ -216,7 +233,8 @@ if __name__ == "__main__":
           prediction = class_names[index]
           
           if index == 1:
-            if output[0][0] > 0.1:
+            lie_score = output[0][0]
+            if lie_score > 0.1:
               prediction = 'lie'
               current_state = 0
           
@@ -224,27 +242,52 @@ if __name__ == "__main__":
           if (current_state == 5 and previous_state == 4) or (current_state == 6 and previous_state == 4):
             cv2.putText(frame, f'The patient is trying to stand up!', (100,500), font, font_scale, text_color, font_thickness)
           
-          if current_state == 2 and previous_state == 1:
-            cv2.putText(frame, f'The patient is trying to sit!', (100,500), font, font_scale, text_color, font_thickness)
           """
+          #if current_state == 2 and previous_state == 1:
+          #  cv2.putText(frame, f'The patient is trying to sit!', (100,500), font, font_scale, text_color, font_thickness)
+          
           
           
           if (current_state == 3 and previous_state == 2) or (current_state == 4 and previous_state == 2):
             cv2.putText(frame, f'The patient is trying to stand up!', (100,500), font, font_scale, text_color, font_thickness)
             transition_state = 1
             
-          if current_state == 1 and previous_state == 0:
+          if current_state == 1 and previous_state == 0 or (current_state == 2 and previous_state == 0):
             cv2.putText(frame, f'The patient is trying to sit!', (100,500), font, font_scale, text_color, font_thickness)
+            transition_state = 2
             
             
+          #Checks for when the person is in sit to stand state
+          
+          #Effort count
           if transition_state == 1:
             if current_state == 2:
-              cv2.putText(frame, f'failed sit to stand transition!', (100,500), font, font_scale, text_color, font_thickness)
+             # cv2.putText(frame, f'failed sit to stand transition!', (100,500), font, font_scale, text_color, font_thickness)
               transition_state = -1
-            if current_state == 4:
-              cv2.putText(frame, f'sit to stand transition complete', (200,500), font, font_scale, (0, 255, 0), font_thickness)
-              transition_state = -1
+              transition_tries += 1
             
+          #complete transition
+            if current_state == 4:
+              #cv2.putText(frame, f'transition_complete!', (300,500), font, font_scale, text_color, font_thickness)
+              transition_state = -1
+              transition_tries = 0
+
+            
+          if transition_state == 2:
+            if current_state == 0:
+              #cv2.putText(frame, f'failed lie to sit transition!', (100,500), font, font_scale, text_color, font_thickness)
+              transition_state = -1
+              transition_tries += 1
+            
+          #complete transition
+            if current_state == 2:
+              #cv2.putText(frame, f'transition_complete!', (300,500), font, font_scale, text_color, font_thickness)
+              transition_state = -1
+              transition_tries = 0
+            
+
+
+
           points = get_points(coordinates)
           
           #draw landmarks on the image
@@ -262,10 +305,11 @@ if __name__ == "__main__":
                 prediction = 'lie'
           
         
-          cv2.putText(frame, f'{prediction}', text_position, font, font_scale, text_color, font_thickness)
-          cv2.putText(frame, f'{output[0][0]}, {output[0][1]}', (50, 200), font, font_scale, text_color, font_thickness)
+          #cv2.putText(frame, f'{prediction}, {score}', text_position, font, font_scale, text_color, font_thickness)
+          #cv2.putText(frame, f'{output[0][0]}, {output[0][1]}', (50, 200), font, font_scale, text_color, font_thickness)
           
-
+        #cv2.putText(frame, f'Tries: {transition_tries}', (400, 200), font, font_scale, text_color, font_thickness)
+        cv2.putText(frame, f'Flexion Angle: {right_hip_angle}, {left_hip_angle}', (400, 200), font, font_scale, text_color, font_thickness)
         cv2.imshow('Video', frame)
         out.write(frame)
 
