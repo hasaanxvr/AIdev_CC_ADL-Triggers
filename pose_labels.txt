@@ -1,5 +1,0 @@
-lie
-lie_to_sit
-sit
-sit_to_stand
-stand
