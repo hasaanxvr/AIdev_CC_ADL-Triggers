@@ -41,6 +41,7 @@ video_path = 'adlvideo26.mp4'
 
 # Open the video file
 cap = cv2.VideoCapture(f'videos/{video_path}')
+cap = cv2.VideoCapture(0)
 
 
 previous_state = -1
@@ -69,7 +70,7 @@ while True:
     
     
     
-    risky_knee_distance = risky_sitting(right_hip, left_hip, right_shoulder, left_shoulder)
+    risky_knee_distance = risky_sitting(right_shoulder, left_shoulder, right_knee, left_knee)
     
     risky_hip_flexion = risky_hip_flexion_angle(right_shoulder, right_hip, right_knee, left_shoulder, left_hip, left_knee)
         
@@ -98,8 +99,10 @@ while True:
     if (current_state == 3 and previous_state == 2) or (current_state == 4 and previous_state == 2):
         cv2.putText(frame, f'The patient is trying to stand up!', (100,500), font, font_scale, text_color, font_thickness)
           
-    cv2.putText(frame, f'{prediction}, {score}', text_position, font, font_scale, text_color, font_thickness)
-    cv2.putText(frame, f'{prediction}, {output[0]}', (100, 300), font, font_scale, (0, 255, 0), font_thickness)
+    #cv2.putText(frame, f'{prediction}, {score}', text_position, font, font_scale, text_color, font_thickness)
+    #cv2.putText(frame, f'{prediction}, {output[0]}', (100, 300), font, font_scale, (0, 255, 0), font_thickness)
+    
+    cv2.putText(frame, f'{risky_hip_flexion}',(100, 300), font, font_scale, text_color, font_thickness)
     cv2.imshow('Video', frame)
 
     # Exit the loop if the 'q' key is pressed

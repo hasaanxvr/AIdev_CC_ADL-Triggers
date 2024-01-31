@@ -39,16 +39,16 @@ def risky_hip_flexion_angle(right_shoulder, right_hip, right_knee, left_shoulder
         
         print(right_hip_angle)
         print(left_hip_angle)
-        if right_hip_angle < 90 or left_hip_angle < 90:
+        if right_hip_angle < 130 or left_hip_angle < 130:
                 return True
         else: return False 
         
 
 
 
-def risky_sitting(right_hip, left_hip, right_knee, left_knee):
+def risky_sitting(right_shoulder, left_shoulder, right_knee, left_knee):
         
-        if abs(right_hip[0] - left_hip[0]) <= abs(right_knee[0] - left_knee[0]):
-                return False
+        if abs(right_shoulder[0] - left_shoulder[0]) >= abs(right_knee[0] - left_knee[0]):
+                return True
         
-        return True
+        return False
