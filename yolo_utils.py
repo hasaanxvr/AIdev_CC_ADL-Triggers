@@ -13,7 +13,7 @@ class YOLOPose(object):
     _BODY_EXPANSION_RATIO = 1.2
     
     def __init__(self):
-        self.yolo_pose = YOLO("yolov8m-pose.pt")
+        self.yolo_pose = YOLO("yolov8n-pose.pt")
         
         self._input_height = 640
         self._input_width = 640

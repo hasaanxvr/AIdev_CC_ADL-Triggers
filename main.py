@@ -4,49 +4,16 @@ from utils import landmarks_to_embedding
 import tensorflow as tf
 from tensorflow import keras
 from yolo_utils import YOLOPose
-
-
-yolo_obj = YOLOPose()
-
-
-
-
+from class_pose_classifier import PoseClassifier
 
 def detect(input_image):
     
-    
-    #yolo_obj.detect(input_image, True)
-    
     yolo_obj.detect(input_image, True)
-    
     results = yolo_obj.detect(input_image, False)    
     return results
 
-
-
-
-
-
-
-
-
-#initialize the YOLO-Pose model
-
-#define a list of class names
-class_names = ['lie', 'lie to sit', 'sit', 'sit to stand', 'stand']
-
-#define the pose classifier
-inputs = tf.keras.Input(shape=(51))
-embedding = landmarks_to_embedding(inputs)
-layer = keras.layers.Dense(128, activation=tf.nn.relu6)(embedding)
-layer = keras.layers.Dropout(0.5)(layer)
-layer = keras.layers.Dense(64, activation=tf.nn.relu6)(layer)
-layer = keras.layers.Dropout(0.5)(layer)
-outputs = keras.layers.Dense(len(class_names), activation="softmax")(layer)
-model_cls = keras.Model(inputs, outputs)
-
-print('Loading the model weights')
-model_cls.load_weights('weights.best_1.hdf5')
+yolo_obj = YOLOPose()
+pose_classifier = PoseClassifier()
 
 
 font = cv2.FONT_HERSHEY_SIMPLEX
@@ -63,6 +30,9 @@ video_path = 'adlvideo130.mp4'
 # Open the video file
 cap = cv2.VideoCapture(f'videos/{video_path}')
 
+
+previous_state = -1
+current_state = -1
 
 # Read and display frames from the video
 while True:
@@ -82,20 +52,25 @@ while True:
     
     i = 0
     while i < 51:
-
         x = landmarks[0][i]
-        
         y = landmarks[0][i+1]
         cv2.circle(frame, (int(x), int(y)), 5, (0, 255, 0), -1)  # Circle radius: 5, color: (0, 255, 0)
         i+= 3
             
         
-    output = model_cls(landmarks)
-
-    index = tf.argmax(output[0])
-          
+    output = pose_classifier.detect(landmarks)
+    
+    index = tf.argmax(output[0])      
+    
+    previous_state = current_state
+    current_state = index
+    
     score = output[0][index]
-    prediction = class_names[index]
+    prediction = pose_classifier.class_names[index]
+    
+    
+    if (current_state == 3 and previous_state == 2) or (current_state == 4 and previous_state == 2):
+        cv2.putText(frame, f'The patient is trying to stand up!', (100,500), font, font_scale, text_color, font_thickness)
           
     print(prediction, score)
     cv2.putText(frame, f'{prediction}, {score}', text_position, font, font_scale, text_color, font_thickness)
