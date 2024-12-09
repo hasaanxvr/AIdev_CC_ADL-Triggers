@@ -1,0 +1,25 @@
+repos:
+  - repo: https://github.com/psf/black
+    rev: 24.10.0
+    hooks:
+      - id: black
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.2
+    hooks:
+      - id: ruff
+        args: [--fix]
+
+  - repo: https://github.com/nbQA-dev/nbQA
+    rev: 1.9.1
+    hooks:
+      - id: nbqa-black
+        name: black on notebooks
+        entry: nbqa black
+        language: python
+        types: [jupyter]
+      - id: nbqa-ruff
+        name: ruff on notebooks
+        entry: nbqa ruff --fix
+        language: python
+        types: [jupyter]
